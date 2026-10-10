@@ -18,6 +18,33 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Debug GitHub OIDC claims
+        shell: bash
+        run: |
+          RESPONSE=$(curl -fsS \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com")
+
+          TOKEN=$(node -e \
+            'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).value))' \
+            <<< "$RESPONSE")
+
+          export TOKEN
+          node -e '
+            const p = JSON.parse(
+              Buffer.from(process.env.TOKEN.split(".")[1], "base64url").toString()
+            );
+            console.log(JSON.stringify({
+              sub: p.sub,
+              aud: p.aud,
+              repository: p.repository,
+              repository_id: p.repository_id,
+              repository_owner_id: p.repository_owner_id,
+              ref: p.ref
+            }, null, 2));
+          '
+
+
       - name: Configure AWS credentials using OIDC
         uses: aws-actions/configure-aws-credentials@v6.3.0
         with:
